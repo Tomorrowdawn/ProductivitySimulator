@@ -20,7 +20,7 @@ interface SimulationControlsProps {
 }
 
 type AnalysisParameter = 'teamSize' | 'resources' | 'defaultIdeaProbability';
-type ComparisonParameter = 'resources' | 'minHoldTime' | 'defaultIdeaProbability';
+type ComparisonParameter = 'teamSize' | 'resources' | 'minHoldTime' | 'defaultIdeaProbability';
 
 
 const NumericInput: React.FC<{
@@ -284,7 +284,11 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
                                 const newParam = e.target.value as AnalysisParameter;
                                 setCa_AnalysisParam(newParam);
                                 if (newParam === ca_compareParam) { // prevent collision
-                                    setCa_CompareParam(newParam === 'resources' ? 'minHoldTime' : 'resources');
+                                    const allCompareOptions: ComparisonParameter[] = ['teamSize', 'resources', 'minHoldTime', 'defaultIdeaProbability'];
+                                    const nextAvailableOption = allCompareOptions.find(p => p !== newParam);
+                                    if(nextAvailableOption) {
+                                        setCa_CompareParam(nextAvailableOption);
+                                    }
                                 }
                                 handleAnalysisParamChange(newParam, setCa_RangeFrom, setCa_RangeTo, setCa_RangeStep);
                             }}
@@ -307,6 +311,7 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
                             onChange={(e) => setCa_CompareParam(e.target.value as ComparisonParameter)}
                             className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                         >
+                            {ca_analysisParam !== 'teamSize' && <option value="teamSize">Team Size</option>}
                             {ca_analysisParam !== 'resources' && <option value="resources">Resources</option>}
                             <option value="minHoldTime">Min Hold Time</option>
                             {ca_analysisParam !== 'defaultIdeaProbability' && <option value="defaultIdeaProbability">Default Idea Probability</option>}

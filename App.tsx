@@ -268,33 +268,29 @@ function App() {
         for (const compareValue of compareValues) {
             const resultsData: AnalysisDataPoint[] = [];
             
-            let membersForAnalysis: Array<{ outputRate: number; }> | null = null;
-            if (config.analysisParam !== 'teamSize') {
-                 const teamSize = params.teamSize;
-                 membersForAnalysis = usePareto
-                    ? generateParetoMembers(teamSize, avgOutputForGenerator)
-                    : Array.from({ length: teamSize }, () => ({ outputRate: avgOutputForGenerator }));
-            }
-
             for (let i = config.from; i <= config.to + (config.step / 2); i += config.step) {
                 const simParams = { ...params };
+                
                 // Set the comparison parameter
-                simParams[config.compareParam] = compareValue;
+                if (config.compareParam === 'teamSize') {
+                    simParams.teamSize = Math.round(compareValue);
+                } else {
+                    simParams[config.compareParam] = compareValue;
+                }
 
                 // Set the analysis parameter (x-axis)
                 if (config.analysisParam === 'teamSize') {
-                    const currentTeamSize = Math.round(i);
-                    simParams.teamSize = currentTeamSize;
-                    simParams.members = usePareto
-                      ? generateParetoMembers(currentTeamSize, avgOutputForGenerator)
-                      : Array.from({ length: currentTeamSize }, () => ({ outputRate: avgOutputForGenerator }));
+                    simParams.teamSize = Math.round(i);
                 } else if (config.analysisParam === 'resources') {
                     simParams.resources = Math.round(i);
-                    simParams.members = membersForAnalysis!;
                 } else { // defaultIdeaProbability
                     simParams.defaultIdeaProbability = parseFloat(i.toPrecision(12));
-                    simParams.members = membersForAnalysis!;
                 }
+                
+                // Generate members based on the final determined teamSize
+                simParams.members = usePareto
+                    ? generateParetoMembers(simParams.teamSize, avgOutputForGenerator)
+                    : Array.from({ length: simParams.teamSize }, () => ({ outputRate: avgOutputForGenerator }));
                 
                 let totalAvgOutput = 0;
                 for (let run = 0; run < config.numRuns; run++) {
