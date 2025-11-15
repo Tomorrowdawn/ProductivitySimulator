@@ -19,14 +19,58 @@ interface SimulationControlsProps {
   setNumRuns: React.Dispatch<React.SetStateAction<number>>;
 }
 
-const InputField: React.FC<{ id: string; label: string; value: number; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; min?: number; max?: number; step?: number; children?: React.ReactNode; disabled?: boolean; }> = ({ id, label, value, onChange, min = 1, max = 100, step = 1, children, disabled=false }) => (
+const NumericInput: React.FC<{
+    value: number;
+    onChange: (newValue: number) => void;
+    [x: string]: any; // for other props
+}> = ({ value, onChange, ...rest }) => {
+    const [strValue, setStrValue] = React.useState(String(value));
+
+    React.useEffect(() => {
+        const numVal = parseFloat(strValue);
+        if (isNaN(numVal) || numVal !== value) {
+            setStrValue(String(value));
+        }
+    }, [value]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setStrValue(val);
+        const num = parseFloat(val);
+        if (!isNaN(num) && isFinite(num)) {
+            onChange(num);
+        }
+    };
+
+    const handleBlur = () => {
+        const num = parseFloat(strValue);
+        if (isNaN(num) || !isFinite(num)) {
+            setStrValue(String(value)); 
+        }
+    };
+
+    const isValid = strValue.trim() !== '' && !isNaN(parseFloat(strValue)) && isFinite(parseFloat(strValue));
+
+    return (
+        <input
+            type="number"
+            value={strValue}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            onWheel={e => (e.target as HTMLElement).blur()}
+            className={`bg-slate-700 border rounded-md px-3 py-2 text-white focus:ring-2 focus:outline-none disabled:bg-slate-800 disabled:cursor-not-allowed ${isValid ? 'border-slate-600 focus:ring-cyan-500' : 'border-red-500 focus:ring-red-500'}`}
+            {...rest}
+        />
+    );
+};
+
+const InputField: React.FC<{ id: string; label: string; value: number; onChange: (value: number) => void; min?: number; max?: number; step?: number; children?: React.ReactNode; disabled?: boolean; }> = ({ id, label, value, onChange, min = 1, max = 100, step = 1, children, disabled=false }) => (
     <div className="flex flex-col space-y-2">
         <label htmlFor={id} className="text-sm font-medium text-slate-400 flex items-center space-x-2">
             {children}
             <span>{label}</span>
         </label>
-        <input
-            type="number"
+        <NumericInput
             id={id}
             value={value}
             onChange={onChange}
@@ -34,7 +78,6 @@ const InputField: React.FC<{ id: string; label: string; value: number; onChange:
             max={max}
             step={step}
             disabled={disabled}
-            className="bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none disabled:bg-slate-800 disabled:cursor-not-allowed"
         />
     </div>
 );
@@ -42,9 +85,9 @@ const InputField: React.FC<{ id: string; label: string; value: number; onChange:
 const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setParams, onRunAnalysis, onReset, isAnalyzing, usePareto, setUsePareto, avgOutputForGenerator, setAvgOutputForGenerator, analysisType, setAnalysisType, numRuns, setNumRuns }) => {
   // State for Productivity Curve
   const [pc_analysisParam, setPc_AnalysisParam] = useState<'teamSize' | 'resources' | 'defaultIdeaProbability'>('teamSize');
-  const [pc_rangeFrom, setPc_RangeFrom] = useState(5);
-  const [pc_rangeTo, setPc_RangeTo] = useState(20);
-  const [pc_rangeStep, setPc_RangeStep] = useState(1);
+  const [pc_rangeFrom, setPc_RangeFrom] = useState(10);
+  const [pc_rangeTo, setPc_RangeTo] = useState(100);
+  const [pc_rangeStep, setPc_RangeStep] = useState(10);
   
   // State for Saturation Analysis
   const [sa_daysFrom, setSa_DaysFrom] = useState(2);
@@ -91,13 +134,13 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
         setPc_RangeTo(0.5);
         setPc_RangeStep(0.05);
     } else if (newParam === 'teamSize') {
-        setPc_RangeFrom(5);
-        setPc_RangeTo(20);
-        setPc_RangeStep(1);
+        setPc_RangeFrom(10);
+        setPc_RangeTo(100);
+        setPc_RangeStep(10);
     } else { // resources
-        setPc_RangeFrom(1);
-        setPc_RangeTo(10);
-        setPc_RangeStep(1);
+        setPc_RangeFrom(10);
+        setPc_RangeTo(50);
+        setPc_RangeStep(5);
     }
   }
 
@@ -107,19 +150,19 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
       <h2 className="text-2xl font-bold text-white mb-6">Simulation Setup</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        <InputField id="teamSize" label="Team Size (N)" value={params.teamSize} onChange={(e) => handleTeamSizeChange(Number(e.target.value))} min={1} max={100} disabled={pc_analysisParam === 'teamSize' && analysisType === AnalysisType.PRODUCTIVITY_CURVE}>
+        <InputField id="teamSize" label="Team Size (N)" value={params.teamSize} onChange={handleTeamSizeChange} min={1} max={100} disabled={pc_analysisParam === 'teamSize' && analysisType === AnalysisType.PRODUCTIVITY_CURVE}>
             <UserIcon className="w-5 h-5" />
         </InputField>
-        <InputField id="resources" label="Resources (R)" value={params.resources} onChange={(e) => handleParamChange('resources', Number(e.target.value))} disabled={pc_analysisParam === 'resources' && analysisType === AnalysisType.PRODUCTIVITY_CURVE}>
+        <InputField id="resources" label="Resources (R)" value={params.resources} onChange={(v) => handleParamChange('resources', v)} disabled={pc_analysisParam === 'resources' && analysisType === AnalysisType.PRODUCTIVITY_CURVE}>
             <ResourceIcon className="w-5 h-5" />
         </InputField>
-        <InputField id="minHoldTime" label="Min Hold Time (K)" value={params.minHoldTime} onChange={(e) => handleParamChange('minHoldTime', Number(e.target.value))}>
+        <InputField id="minHoldTime" label="Min Hold Time (K)" value={params.minHoldTime} onChange={(v) => handleParamChange('minHoldTime', v)}>
             <ClockIcon className="w-5 h-5" />
         </InputField>
-        <InputField id="duration" label="Duration (Days)" value={params.duration} onChange={(e) => handleParamChange('duration', Number(e.target.value))} max={10000}>
+        <InputField id="duration" label="Duration (Days)" value={params.duration} onChange={(v) => handleParamChange('duration', v)} max={10000}>
             <ClockIcon className="w-5 h-5" />
         </InputField>
-        <InputField id="defaultIdeaProbability" label="Default Idea Probability" value={params.defaultIdeaProbability} onChange={(e) => handleParamChange('defaultIdeaProbability', Number(e.target.value))} min={0} max={1} step={0.01} disabled={(pc_analysisParam === 'defaultIdeaProbability' && analysisType === AnalysisType.PRODUCTIVITY_CURVE) || analysisType === AnalysisType.SATURATION_ANALYSIS}>
+        <InputField id="defaultIdeaProbability" label="Default Idea Probability" value={params.defaultIdeaProbability} onChange={(v) => handleParamChange('defaultIdeaProbability', v)} min={0} max={1} step={0.01} disabled={(pc_analysisParam === 'defaultIdeaProbability' && analysisType === AnalysisType.PRODUCTIVITY_CURVE) || analysisType === AnalysisType.SATURATION_ANALYSIS}>
             <LightbulbIcon className="w-5 h-5" />
         </InputField>
       </div>
@@ -141,14 +184,13 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
                  <label htmlFor="avgOutput" className={`text-sm font-medium block mb-2 transition-colors ${usePareto ? 'text-slate-400' : 'text-slate-200'}`}>
                     Average Output Rate (used for distribution)
                 </label>
-                 <input
-                    type="number"
+                 <NumericInput
                     id="avgOutput"
                     value={avgOutputForGenerator}
-                    onChange={(e) => setAvgOutputForGenerator(Number(e.target.value))}
+                    onChange={setAvgOutputForGenerator}
                     min={1}
                     disabled={!usePareto || isAnalyzing}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none disabled:bg-slate-800 disabled:cursor-not-allowed"
+                    className="w-full"
                  />
             </div>
         </div>
@@ -157,7 +199,7 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
       <div className="mb-8">
         <h3 className="text-lg font-semibold text-white mb-4">Analysis Settings</h3>
         <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700 space-y-4">
-            <InputField id="numRuns" label="Runs per Data Point (for averaging)" value={numRuns} onChange={(e) => setNumRuns(Number(e.target.value))} min={1} max={50}>
+            <InputField id="numRuns" label="Runs per Data Point (for averaging)" value={numRuns} onChange={setNumRuns} min={1} max={50}>
                 <RepeatIcon className="w-5 h-5" />
             </InputField>
             <div>
@@ -186,9 +228,9 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
                         </select>
                     </div>
                     <div className="grid grid-cols-3 gap-4">
-                        <InputField id="rangeFrom" label="From" value={pc_rangeFrom} onChange={e => setPc_RangeFrom(Number(e.target.value))} step={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
-                        <InputField id="rangeTo" label="To" value={pc_rangeTo} onChange={e => setPc_RangeTo(Number(e.target.value))} step={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
-                        <InputField id="rangeStep" label="Step" value={pc_rangeStep} onChange={e => setPc_RangeStep(Number(e.target.value))} step={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} min={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
+                        <InputField id="rangeFrom" label="From" value={pc_rangeFrom} onChange={setPc_RangeFrom} step={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
+                        <InputField id="rangeTo" label="To" value={pc_rangeTo} onChange={setPc_RangeTo} step={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
+                        <InputField id="rangeStep" label="Step" value={pc_rangeStep} onChange={setPc_RangeStep} step={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} min={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
                     </div>
                 </>
             )}
@@ -197,14 +239,14 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
                     <div>
                         <label className="text-sm font-medium text-slate-400 block mb-2">Problem Difficulty (Days per Idea)</label>
                          <div className="grid grid-cols-3 gap-4">
-                            <InputField id="sa_daysFrom" label="From (Easy)" value={sa_daysFrom} onChange={e => setSa_DaysFrom(Number(e.target.value))} step={1} max={1000} min={1} />
-                            <InputField id="sa_daysTo" label="To (Hard)" value={sa_daysTo} onChange={e => setSa_DaysTo(Number(e.target.value))} step={1} max={1000} min={1} />
-                            <InputField id="sa_daysStep" label="Step" value={sa_daysStep} onChange={e => setSa_DaysStep(Number(e.target.value))} step={1} min={1} />
+                            <InputField id="sa_daysFrom" label="From (Easy)" value={sa_daysFrom} onChange={setSa_DaysFrom} step={1} max={1000} min={1} />
+                            <InputField id="sa_daysTo" label="To (Hard)" value={sa_daysTo} onChange={setSa_DaysTo} step={1} max={1000} min={1} />
+                            <InputField id="sa_daysStep" label="Step" value={sa_daysStep} onChange={setSa_DaysStep} step={1} min={1} />
                         </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <InputField id="sa_maxTeamSize" label="Max Team Size to Scan" value={sa_maxTeamSize} onChange={e => setSa_MaxTeamSize(Number(e.target.value))} min={5} max={200} />
-                        <InputField id="sa_teamSizeStep" label="Team Size Scan Step" value={sa_teamSizeStep} onChange={e => setSa_TeamSizeStep(Number(e.target.value))} min={1} max={10} />
+                        <InputField id="sa_maxTeamSize" label="Max Team Size to Scan" value={sa_maxTeamSize} onChange={setSa_MaxTeamSize} min={5} max={200} />
+                        <InputField id="sa_teamSizeStep" label="Team Size Scan Step" value={sa_teamSizeStep} onChange={setSa_TeamSizeStep} min={1} max={10} />
                     </div>
                 </>
             )}

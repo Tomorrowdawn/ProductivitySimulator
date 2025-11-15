@@ -6,10 +6,10 @@ import AnalysisChart from './components/AnalysisChart';
 
 const DEFAULT_PARAMS: SimulationParams = {
   teamSize: 10,
-  resources: 3,
+  resources: 10,
   minHoldTime: 5,
   duration: 365,
-  defaultIdeaProbability: 0.1,
+  defaultIdeaProbability: 0.01,
   members: Array.from({ length: 10 }, () => ({ outputRate: 10 })),
 };
 
@@ -200,7 +200,7 @@ function App() {
   const [yAxisLabel, setYAxisLabel] = useState('');
   const [analysisType, setAnalysisType] = useState<AnalysisType>(AnalysisType.PRODUCTIVITY_CURVE);
   const [xDomain, setXDomain] = useState<[number, number] | null>(null);
-  const [numRuns, setNumRuns] = useState(1);
+  const [numRuns, setNumRuns] = useState(20);
 
   const handleRunAnalysis = useCallback(async (config: any) => {
     setIsAnalyzing(true);
@@ -303,7 +303,7 @@ function App() {
     setUsePareto(true);
     setAnalysisType(AnalysisType.PRODUCTIVITY_CURVE);
     setXDomain(null);
-    setNumRuns(1);
+    setNumRuns(20);
   };
 
 
