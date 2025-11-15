@@ -1,0 +1,5 @@
+{
+  "name": "Team Productivity Simulator",
+  "description": "An application to simulate and calculate team output based on individual productivity, idea generation probability, and a fair resource allocation system. Configure team size, resources, and member attributes to analyze average productivity over a simulated period.",
+  "requestFramePermissions": []
+}
