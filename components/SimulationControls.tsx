@@ -19,6 +19,10 @@ interface SimulationControlsProps {
   setNumRuns: React.Dispatch<React.SetStateAction<number>>;
 }
 
+type AnalysisParameter = 'teamSize' | 'resources' | 'defaultIdeaProbability';
+type ComparisonParameter = 'resources' | 'minHoldTime' | 'defaultIdeaProbability';
+
+
 const NumericInput: React.FC<{
     value: number;
     onChange: (newValue: number) => void;
@@ -64,27 +68,38 @@ const NumericInput: React.FC<{
     );
 };
 
-const InputField: React.FC<{ id: string; label: string; value: number; onChange: (value: number) => void; min?: number; max?: number; step?: number; children?: React.ReactNode; disabled?: boolean; }> = ({ id, label, value, onChange, min = 1, max = 100, step = 1, children, disabled=false }) => (
+const InputField: React.FC<{ id: string; label: string; value: number | string; onChange: (value: any) => void; type?: string; min?: number; max?: number; step?: number; children?: React.ReactNode; disabled?: boolean; }> = ({ id, label, value, onChange, type='number', min = 1, max = 100, step = 1, children, disabled=false }) => (
     <div className="flex flex-col space-y-2">
         <label htmlFor={id} className="text-sm font-medium text-slate-400 flex items-center space-x-2">
             {children}
             <span>{label}</span>
         </label>
-        <NumericInput
-            id={id}
-            value={value}
-            onChange={onChange}
-            min={min}
-            max={max}
-            step={step}
-            disabled={disabled}
-        />
+        {type === 'number' ? (
+             <NumericInput
+                id={id}
+                value={value as number}
+                onChange={onChange}
+                min={min}
+                max={max}
+                step={step}
+                disabled={disabled}
+            />
+        ) : (
+            <input
+                type="text"
+                id={id}
+                value={value as string}
+                onChange={(e) => onChange(e.target.value)}
+                disabled={disabled}
+                className="bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none disabled:bg-slate-800 disabled:cursor-not-allowed"
+             />
+        )}
     </div>
 );
 
 const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setParams, onRunAnalysis, onReset, isAnalyzing, usePareto, setUsePareto, avgOutputForGenerator, setAvgOutputForGenerator, analysisType, setAnalysisType, numRuns, setNumRuns }) => {
   // State for Productivity Curve
-  const [pc_analysisParam, setPc_AnalysisParam] = useState<'teamSize' | 'resources' | 'defaultIdeaProbability'>('teamSize');
+  const [pc_analysisParam, setPc_AnalysisParam] = useState<AnalysisParameter>('teamSize');
   const [pc_rangeFrom, setPc_RangeFrom] = useState(10);
   const [pc_rangeTo, setPc_RangeTo] = useState(100);
   const [pc_rangeStep, setPc_RangeStep] = useState(10);
@@ -95,6 +110,14 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
   const [sa_daysStep, setSa_DaysStep] = useState(2);
   const [sa_maxTeamSize, setSa_MaxTeamSize] = useState(50);
   const [sa_teamSizeStep, setSa_TeamSizeStep] = useState(1);
+    
+  // State for Comparative Analysis
+  const [ca_analysisParam, setCa_AnalysisParam] = useState<AnalysisParameter>('teamSize');
+  const [ca_rangeFrom, setCa_RangeFrom] = useState(10);
+  const [ca_rangeTo, setCa_RangeTo] = useState(100);
+  const [ca_rangeStep, setCa_RangeStep] = useState(10);
+  const [ca_compareParam, setCa_CompareParam] = useState<ComparisonParameter>('minHoldTime');
+  const [ca_compareValues, setCa_CompareValues] = useState('5, 10, 20');
 
 
   const handleParamChange = <K extends keyof SimulationParams,>(key: K, value: SimulationParams[K]) => {
@@ -122,47 +145,59 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
   const handleRunClick = () => {
       if (analysisType === AnalysisType.PRODUCTIVITY_CURVE) {
           onRunAnalysis({ type: AnalysisType.PRODUCTIVITY_CURVE, param: pc_analysisParam, from: pc_rangeFrom, to: pc_rangeTo, step: pc_rangeStep, numRuns });
-      } else {
+      } else if (analysisType === AnalysisType.SATURATION_ANALYSIS){
           onRunAnalysis({ type: AnalysisType.SATURATION_ANALYSIS, daysFrom: sa_daysFrom, daysTo: sa_daysTo, daysStep: sa_daysStep, maxTeamSize: sa_maxTeamSize, teamSizeStep: sa_teamSizeStep, numRuns });
+      } else if (analysisType === AnalysisType.COMPARATIVE_ANALYSIS) {
+          onRunAnalysis({ type: AnalysisType.COMPARATIVE_ANALYSIS, analysisParam: ca_analysisParam, from: ca_rangeFrom, to: ca_rangeTo, step: ca_rangeStep, compareParam: ca_compareParam, compareValues: ca_compareValues, numRuns })
       }
   }
 
-  const handlePcAnalysisParamChange = (newParam: 'teamSize' | 'resources' | 'defaultIdeaProbability') => {
-    setPc_AnalysisParam(newParam);
+  const handleAnalysisParamChange = (
+      newParam: AnalysisParameter,
+      setFrom: (v: number) => void,
+      setTo: (v: number) => void,
+      setStep: (v: number) => void,
+  ) => {
     if (newParam === 'defaultIdeaProbability') {
-        setPc_RangeFrom(0.05);
-        setPc_RangeTo(0.5);
-        setPc_RangeStep(0.05);
+        setFrom(0.05);
+        setTo(0.5);
+        setStep(0.05);
     } else if (newParam === 'teamSize') {
-        setPc_RangeFrom(10);
-        setPc_RangeTo(100);
-        setPc_RangeStep(10);
+        setFrom(10);
+        setTo(100);
+        setStep(10);
     } else { // resources
-        setPc_RangeFrom(10);
-        setPc_RangeTo(50);
-        setPc_RangeStep(5);
+        setFrom(10);
+        setTo(50);
+        setStep(5);
     }
   }
-
+  
+  const isParamDisabled = (param: keyof SimulationParams) => {
+      if (analysisType === AnalysisType.PRODUCTIVITY_CURVE && pc_analysisParam === param) return true;
+      if (analysisType === AnalysisType.COMPARATIVE_ANALYSIS && (ca_analysisParam === param || ca_compareParam === param)) return true;
+      if (analysisType === AnalysisType.SATURATION_ANALYSIS && param === 'defaultIdeaProbability') return true;
+      return false;
+  }
 
   return (
     <div className="bg-slate-800/50 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-slate-700">
       <h2 className="text-2xl font-bold text-white mb-6">Simulation Setup</h2>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-        <InputField id="teamSize" label="Team Size (N)" value={params.teamSize} onChange={handleTeamSizeChange} min={1} max={100} disabled={pc_analysisParam === 'teamSize' && analysisType === AnalysisType.PRODUCTIVITY_CURVE}>
+        <InputField id="teamSize" label="Team Size (N)" value={params.teamSize} onChange={handleTeamSizeChange} min={1} max={500} disabled={isParamDisabled('teamSize')}>
             <UserIcon className="w-5 h-5" />
         </InputField>
-        <InputField id="resources" label="Resources (R)" value={params.resources} onChange={(v) => handleParamChange('resources', v)} disabled={pc_analysisParam === 'resources' && analysisType === AnalysisType.PRODUCTIVITY_CURVE}>
+        <InputField id="resources" label="Resources (R)" value={params.resources} onChange={(v) => handleParamChange('resources', v)} disabled={isParamDisabled('resources')}>
             <ResourceIcon className="w-5 h-5" />
         </InputField>
-        <InputField id="minHoldTime" label="Min Hold Time (K)" value={params.minHoldTime} onChange={(v) => handleParamChange('minHoldTime', v)}>
+        <InputField id="minHoldTime" label="Min Hold Time (K)" value={params.minHoldTime} onChange={(v) => handleParamChange('minHoldTime', v)} disabled={isParamDisabled('minHoldTime')}>
             <ClockIcon className="w-5 h-5" />
         </InputField>
         <InputField id="duration" label="Duration (Days)" value={params.duration} onChange={(v) => handleParamChange('duration', v)} max={10000}>
             <ClockIcon className="w-5 h-5" />
         </InputField>
-        <InputField id="defaultIdeaProbability" label="Default Idea Probability" value={params.defaultIdeaProbability} onChange={(v) => handleParamChange('defaultIdeaProbability', v)} min={0} max={1} step={0.01} disabled={(pc_analysisParam === 'defaultIdeaProbability' && analysisType === AnalysisType.PRODUCTIVITY_CURVE) || analysisType === AnalysisType.SATURATION_ANALYSIS}>
+        <InputField id="defaultIdeaProbability" label="Default Idea Probability" value={params.defaultIdeaProbability} onChange={(v) => handleParamChange('defaultIdeaProbability', v)} min={0} max={1} step={0.01} disabled={isParamDisabled('defaultIdeaProbability')}>
             <LightbulbIcon className="w-5 h-5" />
         </InputField>
       </div>
@@ -210,6 +245,7 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
                     className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                 >
                     <option value={AnalysisType.PRODUCTIVITY_CURVE}>Productivity Curve</option>
+                    <option value={AnalysisType.COMPARATIVE_ANALYSIS}>Comparative Analysis</option>
                     <option value={AnalysisType.SATURATION_ANALYSIS}>Saturation Point Analysis</option>
                 </select>
             </div>
@@ -219,7 +255,11 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
                         <label className="text-sm font-medium text-slate-400 block mb-2">Analyze By</label>
                         <select 
                             value={pc_analysisParam}
-                            onChange={(e) => handlePcAnalysisParamChange(e.target.value as 'teamSize' | 'resources' | 'defaultIdeaProbability')}
+                            onChange={(e) => {
+                                const newParam = e.target.value as AnalysisParameter;
+                                setPc_AnalysisParam(newParam);
+                                handleAnalysisParamChange(newParam, setPc_RangeFrom, setPc_RangeTo, setPc_RangeStep);
+                            }}
                             className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
                         >
                             <option value="teamSize">Team Size</option>
@@ -232,6 +272,47 @@ const SimulationControls: React.FC<SimulationControlsProps> = ({ params, setPara
                         <InputField id="rangeTo" label="To" value={pc_rangeTo} onChange={setPc_RangeTo} step={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
                         <InputField id="rangeStep" label="Step" value={pc_rangeStep} onChange={setPc_RangeStep} step={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} min={pc_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
                     </div>
+                </>
+            )}
+            {analysisType === AnalysisType.COMPARATIVE_ANALYSIS && (
+                 <>
+                    <div>
+                        <label className="text-sm font-medium text-slate-400 block mb-2">Analyze By (X-Axis)</label>
+                         <select 
+                            value={ca_analysisParam}
+                            onChange={(e) => {
+                                const newParam = e.target.value as AnalysisParameter;
+                                setCa_AnalysisParam(newParam);
+                                if (newParam === ca_compareParam) { // prevent collision
+                                    setCa_CompareParam(newParam === 'resources' ? 'minHoldTime' : 'resources');
+                                }
+                                handleAnalysisParamChange(newParam, setCa_RangeFrom, setCa_RangeTo, setCa_RangeStep);
+                            }}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                        >
+                            <option value="teamSize">Team Size</option>
+                            <option value="resources">Resources</option>
+                            <option value="defaultIdeaProbability">Default Idea Probability</option>
+                        </select>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                        <InputField id="ca_rangeFrom" label="From" value={ca_rangeFrom} onChange={setCa_RangeFrom} step={ca_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
+                        <InputField id="ca_rangeTo" label="To" value={ca_rangeTo} onChange={setCa_RangeTo} step={ca_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
+                        <InputField id="ca_rangeStep" label="Step" value={ca_rangeStep} onChange={setCa_RangeStep} step={ca_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} min={ca_analysisParam === 'defaultIdeaProbability' ? 0.01 : 1} />
+                    </div>
+                     <div>
+                        <label className="text-sm font-medium text-slate-400 block mb-2">Compare By</label>
+                         <select 
+                            value={ca_compareParam}
+                            onChange={(e) => setCa_CompareParam(e.target.value as ComparisonParameter)}
+                            className="w-full bg-slate-700 border border-slate-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                        >
+                            {ca_analysisParam !== 'resources' && <option value="resources">Resources</option>}
+                            <option value="minHoldTime">Min Hold Time</option>
+                            {ca_analysisParam !== 'defaultIdeaProbability' && <option value="defaultIdeaProbability">Default Idea Probability</option>}
+                        </select>
+                    </div>
+                    <InputField id="ca_compareValues" label="Comparison Values (comma-separated)" type="text" value={ca_compareValues} onChange={setCa_CompareValues} />
                 </>
             )}
             {analysisType === AnalysisType.SATURATION_ANALYSIS && (

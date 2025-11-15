@@ -189,6 +189,15 @@ const findSaturationPoint = (curve: AnalysisDataPoint[], maxTeamSize: number): n
     return maxTeamSize;
 }
 
+const getParamLabel = (param: string) => {
+    switch (param) {
+        case 'teamSize': return 'Team Size (N)';
+        case 'resources': return 'Resources (R)';
+        case 'minHoldTime': return 'Min Hold Time (K)';
+        case 'defaultIdeaProbability': return 'Idea Probability (P)';
+        default: return '';
+    }
+}
 
 function App() {
   const [params, setParams] = useState<SimulationParams>(DEFAULT_PARAMS);
@@ -211,19 +220,10 @@ function App() {
     await new Promise(resolve => setTimeout(resolve, 50));
 
     if (config.type === AnalysisType.PRODUCTIVITY_CURVE) {
-        const getXAxisLabel = () => {
-            switch (config.param) {
-                case 'teamSize': return 'Team Size (N)';
-                case 'resources': return 'Resources (R)';
-                case 'defaultIdeaProbability': return 'Idea Probability';
-                default: return '';
-            }
-        }
-        setXAxisLabel(getXAxisLabel());
+        setXAxisLabel(getParamLabel(config.param));
         setYAxisLabel('Avg. Daily Output');
         
         const resultsData: AnalysisDataPoint[] = [];
-
         let membersForAnalysis: Array<{ outputRate: number; }> | null = null;
         if (config.param === 'resources' || config.param === 'defaultIdeaProbability') {
             const teamSize = params.teamSize;
@@ -231,7 +231,6 @@ function App() {
                 ? generateParetoMembers(teamSize, avgOutputForGenerator)
                 : Array.from({ length: teamSize }, () => ({ outputRate: avgOutputForGenerator }));
         }
-
 
         for (let i = config.from; i <= config.to + (config.step / 2); i += config.step) {
           const simParams = { ...params };
@@ -258,6 +257,57 @@ function App() {
           resultsData.push({ x: i, y: finalAvgOutput });
         }
         setAnalysisResults([{ label: 'Average Daily Output', data: resultsData }]);
+
+    } else if (config.type === AnalysisType.COMPARATIVE_ANALYSIS) {
+        setXAxisLabel(getParamLabel(config.analysisParam));
+        setYAxisLabel('Avg. Daily Output');
+
+        const allResults: AnalysisResult[] = [];
+        const compareValues = config.compareValues.split(',').map((v: string) => parseFloat(v.trim())).filter((v: number) => !isNaN(v));
+        
+        for (const compareValue of compareValues) {
+            const resultsData: AnalysisDataPoint[] = [];
+            
+            let membersForAnalysis: Array<{ outputRate: number; }> | null = null;
+            if (config.analysisParam !== 'teamSize') {
+                 const teamSize = params.teamSize;
+                 membersForAnalysis = usePareto
+                    ? generateParetoMembers(teamSize, avgOutputForGenerator)
+                    : Array.from({ length: teamSize }, () => ({ outputRate: avgOutputForGenerator }));
+            }
+
+            for (let i = config.from; i <= config.to + (config.step / 2); i += config.step) {
+                const simParams = { ...params };
+                // Set the comparison parameter
+                simParams[config.compareParam] = compareValue;
+
+                // Set the analysis parameter (x-axis)
+                if (config.analysisParam === 'teamSize') {
+                    const currentTeamSize = Math.round(i);
+                    simParams.teamSize = currentTeamSize;
+                    simParams.members = usePareto
+                      ? generateParetoMembers(currentTeamSize, avgOutputForGenerator)
+                      : Array.from({ length: currentTeamSize }, () => ({ outputRate: avgOutputForGenerator }));
+                } else if (config.analysisParam === 'resources') {
+                    simParams.resources = Math.round(i);
+                    simParams.members = membersForAnalysis!;
+                } else { // defaultIdeaProbability
+                    simParams.defaultIdeaProbability = parseFloat(i.toPrecision(12));
+                    simParams.members = membersForAnalysis!;
+                }
+                
+                let totalAvgOutput = 0;
+                for (let run = 0; run < config.numRuns; run++) {
+                    const result = runSingleSimulation(simParams);
+                    totalAvgOutput += result.averageOutput;
+                }
+                const finalAvgOutput = totalAvgOutput / config.numRuns;
+                resultsData.push({ x: i, y: finalAvgOutput });
+            }
+            const shortLabel = getParamLabel(config.compareParam).match(/\(([^)]+)\)/)?.[1] || config.compareParam;
+            allResults.push({ label: `${shortLabel} = ${compareValue}`, data: resultsData });
+        }
+        setAnalysisResults(allResults);
 
     } else if (config.type === AnalysisType.SATURATION_ANALYSIS) {
         setXAxisLabel('Problem Difficulty (Avg. Days per Idea)');
